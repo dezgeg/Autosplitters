@@ -7,6 +7,7 @@ init {
     current.selectedTeamIndex = 0;
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     current.missionMedals = new byte[vars.NUM_MISSIONS];
+    vars.baseAddr = (uint)modules.First().BaseAddress;
 }
 
 update {
@@ -15,7 +16,7 @@ update {
     // movsx   ecx, byte_137811F
     // imul    ecx, 0F10h
     // movsx   eax, byte_138F3C4[ecx]
-    current.selectedTeamIndex = memory.ReadValue<byte>(new IntPtr(0x0137811f));
+    current.selectedTeamIndex = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x047811f));
     if (current.selectedTeamIndex != old.selectedTeamIndex) {
         //print("selected team change: " + current.selectedTeamIndex);
     }
@@ -30,19 +31,19 @@ update {
     // mov     eax, dword_138ED08[ecx*8]
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     for (int i = 0; i < vars.NUM_TRAININGS; i++) {
-        current.trainingMedals[i] = memory.ReadValue<byte>(new IntPtr(0x0138f3c4 + current.selectedTeamIndex * 3856 + i));
+        current.trainingMedals[i] = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48f3c4 + current.selectedTeamIndex * 3856 + i));
         //print("training: " + i + " is: " + current.trainingMedals[i]);
     }
 
     current.missionMedals = new byte[vars.NUM_MISSIONS];
     for (int i = 0; i < vars.NUM_MISSIONS; i++) {
-        current.missionMedals[i] = memory.ReadValue<byte>(new IntPtr(0x0138ed08 + current.selectedTeamIndex * 3856 + 8 * i));
+        current.missionMedals[i] = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48ed08 + current.selectedTeamIndex * 3856 + 8 * i));
         //print("mission: " + i + " is: " + current.missionMedals[i]);
     }
 }
 
 split {
-    if (current.selectedTeamIndex == 0 || current.selectedTeamIndex != old.selectedTeamIndex)
+    if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
     for (int i = 0; i < vars.NUM_TRAININGS; i++) {
@@ -72,12 +73,12 @@ start {
     // mov     [edi+124h], eax
     // mov     dword_12a03dc, edi
     //         ^^^^^^^^^^^^^
-    var topmostWindow = memory.ReadValue<uint>(new IntPtr(0x012a03dc));
+    var topmostWindow = memory.ReadValue<uint>(new IntPtr(vars.baseAddr + 0x3a03dc));
     if (topmostWindow != 0x0) {
         // Start timer if vtable of window object points to one for dialog box
         // (in other words, on popup showing 1st basic training instructions)
         var vtable = memory.ReadValue<uint>(new IntPtr(topmostWindow));
-        return vtable == 0x011585a8;
+        return vtable == vars.baseAddr + 0x2585a8;
     }
     return false;
 }
