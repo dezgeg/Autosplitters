@@ -3,22 +3,33 @@ state("WA") {}
 init {
     vars.NUM_TRAININGS = 6;
     vars.NUM_MISSIONS = 33;
+    vars.baseAddr = (uint)modules.First().BaseAddress;
 
-    current.selectedTeamIndex = 0;
+    current.inMainGame = 0;
+    current.maxDeathmatchRank = 0;
+    current.selectedTeamIndex = -1;
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     current.missionMedals = new byte[vars.NUM_MISSIONS];
-    vars.baseAddr = (uint)modules.First().BaseAddress;
 }
 
 update {
+    current.inMainGame = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x3c0a20));
+
     // Index of the team selected for doing missions/trainings in GUI (0 == no team)
     // First locate training medals array (see below) then find xref like:
     // movsx   ecx, byte_137811F
     // imul    ecx, 0F10h
     // movsx   eax, byte_138F3C4[ecx]
     current.selectedTeamIndex = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x047811f));
+
+    var deathmatchRank = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48f382 + current.selectedTeamIndex * 3856)) / 2;
     if (current.selectedTeamIndex != old.selectedTeamIndex) {
-        //print("selected team change: " + current.selectedTeamIndex);
+        print("selected team change: " + current.selectedTeamIndex);
+        current.maxDeathmatchRank = deathmatchRank;
+    } else {
+        // Value in memory is times 2
+        // As rank can go down if we lose, take Max()
+        current.maxDeathmatchRank = Math.Max(current.maxDeathmatchRank, deathmatchRank);
     }
 
     // Xref search for: aGraphicsTeamin_1 db 'Graphics\TeamInfo\MissionBronze.bmp',0
@@ -46,6 +57,9 @@ split {
     if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
+    if (current.maxDeathmatchRank > old.maxDeathmatchRank)
+        return true;
+
     for (int i = 0; i < vars.NUM_TRAININGS; i++) {
         if (old.trainingMedals[i] != 3 && current.trainingMedals[i] == 3) {
             //print("golded in training: " + i);
@@ -64,6 +78,12 @@ split {
 }
 
 start {
+    if (current.selectedTeamIndex != old.selectedTeamIndex)
+        return false;
+
+    if (current.inMainGame == 1 && old.inMainGame == 0)
+        return true;
+
     // Pointer to topmost GUI window. To locate:
     // xref search for LockWindowUpdate, pick function which has this in beginning:
     // call    ds:ReleaseCapture
