@@ -1,5 +1,9 @@
 state("WA") {}
 
+startup {
+    settings.Add("basicTrainingSubsplits", false, "Basic Training subsplits");
+}
+
 init {
     vars.NUM_TRAININGS = 6;
     vars.NUM_MISSIONS = 33;
@@ -10,6 +14,7 @@ init {
     current.selectedTeamIndex = -1;
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     current.missionMedals = new byte[vars.NUM_MISSIONS];
+    current.isOnPopupWindow = false;
 }
 
 update {
@@ -51,6 +56,23 @@ update {
         current.missionMedals[i] = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48ed08 + current.selectedTeamIndex * 3856 + 8 * i));
         //print("mission: " + i + " is: " + current.missionMedals[i]);
     }
+
+    // Pointer to topmost GUI window. To locate:
+    // xref search for LockWindowUpdate, pick function which has this in beginning:
+    // call    ds:ReleaseCapture
+    // mov     eax, dword_12a03dc
+    // mov     ecx, [edi+60h]
+    // mov     esi, [edi+5Ch]
+    // mov     [edi+124h], eax
+    // mov     dword_12a03dc, edi
+    //         ^^^^^^^^^^^^^
+    var topmostWindow = memory.ReadValue<uint>(new IntPtr(vars.baseAddr + 0x3a03dc));
+    if (topmostWindow != 0x0) {
+        var vtable = memory.ReadValue<uint>(new IntPtr(topmostWindow));
+        // Start timer if vtable of window object points to one for dialog box
+        // (in other words, on popup showing 1st basic training instructions)
+        current.isOnPopupWindow = vtable == vars.baseAddr + 0x2585a8;
+    }
 }
 
 split {
@@ -74,6 +96,10 @@ split {
         }
     }
 
+    if (settings["basicTrainingSubsplits"] && current.trainingMedals[0] < 3 && current.maxDeathmatchRank == 0) {
+        return current.isOnPopupWindow && !old.isOnPopupWindow;
+    }
+
     return false;
 }
 
@@ -84,21 +110,5 @@ start {
     if (current.inMainGame == 1 && old.inMainGame == 0)
         return true;
 
-    // Pointer to topmost GUI window. To locate:
-    // xref search for LockWindowUpdate, pick function which has this in beginning:
-    // call    ds:ReleaseCapture
-    // mov     eax, dword_12a03dc
-    // mov     ecx, [edi+60h]
-    // mov     esi, [edi+5Ch]
-    // mov     [edi+124h], eax
-    // mov     dword_12a03dc, edi
-    //         ^^^^^^^^^^^^^
-    var topmostWindow = memory.ReadValue<uint>(new IntPtr(vars.baseAddr + 0x3a03dc));
-    if (topmostWindow != 0x0) {
-        // Start timer if vtable of window object points to one for dialog box
-        // (in other words, on popup showing 1st basic training instructions)
-        var vtable = memory.ReadValue<uint>(new IntPtr(topmostWindow));
-        return vtable == vars.baseAddr + 0x2585a8;
-    }
-    return false;
+    return current.isOnPopupWindow && !old.isOnPopupWindow;
 }
