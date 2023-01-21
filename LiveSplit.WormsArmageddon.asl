@@ -8,6 +8,7 @@ init {
     vars.NUM_TRAININGS = 6;
     vars.NUM_MISSIONS = 33;
     vars.baseAddr = (uint)modules.First().BaseAddress;
+    vars.skipNextSplitHack = false;
 
     current.inMainGame = 0;
     current.maxDeathmatchRank = 0;
@@ -96,8 +97,16 @@ split {
         }
     }
 
-    if (settings["basicTrainingSubsplits"] && current.trainingMedals[0] < 3 && current.maxDeathmatchRank == 0) {
-        return current.isOnPopupWindow && !old.isOnPopupWindow;
+    if (settings["basicTrainingSubsplits"] &&
+            current.trainingMedals[0] < 3 &&
+            current.maxDeathmatchRank == 0 &&
+            current.inMainGame == 1 && old.inMainGame == 0) {
+        if (vars.skipNextSplitHack) {
+            print("clear hack");
+            vars.skipNextSplitHack = false;
+            return false;
+        }
+        return true;
     }
 
     return false;
@@ -107,8 +116,17 @@ start {
     if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
+    // Deathmatch
     if (current.inMainGame == 1 && old.inMainGame == 0)
         return true;
 
-    return current.isOnPopupWindow && !old.isOnPopupWindow;
+    if (current.isOnPopupWindow && !old.isOnPopupWindow) {
+        if (settings["basicTrainingSubsplits"]) {
+            print("set hack");
+            vars.skipNextSplitHack = true;
+        }
+        return true;
+    }
+
+    return false;
 }
