@@ -11,7 +11,7 @@ init {
     vars.skipNextSplitHack = false;
 
     current.inMainGame = 0;
-    current.maxDeathmatchRank = 0;
+    current.deathmatchWins = 0;
     current.selectedTeamIndex = -1;
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     current.missionMedals = new byte[vars.NUM_MISSIONS];
@@ -28,15 +28,8 @@ update {
     // movsx   eax, byte_138F3C4[ecx]
     current.selectedTeamIndex = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x047811f));
 
-    var deathmatchRank = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48f382 + current.selectedTeamIndex * 3856)) / 2;
-    if (current.selectedTeamIndex != old.selectedTeamIndex) {
-        print("selected team change: " + current.selectedTeamIndex);
-        current.maxDeathmatchRank = deathmatchRank;
-    } else {
-        // Value in memory is times 2
-        // As rank can go down if we lose, take Max()
-        current.maxDeathmatchRank = Math.Max(current.maxDeathmatchRank, deathmatchRank);
-    }
+    // TODO document this address
+    current.deathmatchWins = memory.ReadValue<byte>(new IntPtr(vars.baseAddr + 0x48ecd8 + current.selectedTeamIndex * 3856));
 
     // Xref search for: aGraphicsTeamin_1 db 'Graphics\TeamInfo\MissionBronze.bmp',0
     // Before it, training medals array access looks like:
@@ -80,7 +73,7 @@ split {
     if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
-    if (current.maxDeathmatchRank > old.maxDeathmatchRank)
+    if (current.deathmatchWins > old.deathmatchWins)
         return true;
 
     for (int i = 0; i < vars.NUM_TRAININGS; i++) {
@@ -99,7 +92,7 @@ split {
 
     if (settings["basicTrainingSubsplits"] &&
             current.trainingMedals[0] < 3 &&
-            current.maxDeathmatchRank == 0 &&
+            current.deathmatchWins == 0 &&
             current.inMainGame == 1 && old.inMainGame == 0) {
         if (vars.skipNextSplitHack) {
             print("clear hack");
