@@ -16,6 +16,8 @@ init {
     current.trainingMedals = new byte[vars.NUM_TRAININGS];
     current.missionMedals = new byte[vars.NUM_MISSIONS];
     current.isOnPopupWindow = false;
+    current.isOnPleaseWaitWindow = false;
+    current.isOnSingleplayerWindow = false;
 }
 
 update {
@@ -66,10 +68,16 @@ update {
         // Start timer if vtable of window object points to one for dialog box
         // (in other words, on popup showing 1st basic training instructions)
         current.isOnPopupWindow = vtable == vars.baseAddr + 0x2585a8;
+        current.isOnPleaseWaitWindow = vtable == vars.baseAddr + 0x25f040;
+        current.isOnSingleplayerWindow = vtable == vars.baseAddr + 0x2603b0;
     }
 }
 
 split {
+    // Quick game was launched
+    if (current.isOnPleaseWaitWindow && old.isOnSingleplayerWindow)
+        return true;
+
     if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
@@ -90,12 +98,13 @@ split {
         }
     }
 
+    // If 'Basic Training subsplits' set, then split at start of each round.
+    // (Except the very first one of course)
     if (settings["basicTrainingSubsplits"] &&
             current.trainingMedals[0] < 3 &&
             current.deathmatchWins == 0 &&
             current.inMainGame == 1 && old.inMainGame == 0) {
         if (vars.skipNextSplitHack) {
-            print("clear hack");
             vars.skipNextSplitHack = false;
             return false;
         }
@@ -106,16 +115,20 @@ split {
 }
 
 start {
+    // Quick game was launched
+    if (current.isOnPleaseWaitWindow && old.isOnSingleplayerWindow)
+        return true;
+
     if (current.selectedTeamIndex != old.selectedTeamIndex)
         return false;
 
-    // Deathmatch
+    // Deathmatch was launched
     if (current.inMainGame == 1 && old.inMainGame == 0)
         return true;
 
+    // Basic training was launched
     if (current.isOnPopupWindow && !old.isOnPopupWindow) {
         if (settings["basicTrainingSubsplits"]) {
-            print("set hack");
             vars.skipNextSplitHack = true;
         }
         return true;
